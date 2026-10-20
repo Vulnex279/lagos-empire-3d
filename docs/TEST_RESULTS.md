@@ -24,6 +24,8 @@ Gameplay tests instantiate the real main scene. They exercise menu startup, floo
 
 Two defects found by the first test pass were fixed: JSON number-type changes on reload and a vehicle-exit ground-overlap probe. Visual inspection also drove a lighting correction, clearer shop frontage, interior roofing and removal of an oversized near-camera interior sign. Static world geometry now uses spatial MultiMesh batches, retaining independent collision bodies.
 
+Clean-package verification exposed an intermittent audio-playback resource reference during immediate shutdown. Teardown now stops and releases streams and gives the mixer a short drain interval before quitting; the test and capture harnesses use the same cleanup.
+
 Run `bash tools/validate.sh` to reproduce checks. `tests/capture_screens.gd` requires a real rendering display (a virtual X display with software OpenGL also works). Tests use separate save files and clean them up; screenshot capture uses volatile state. No test needs a paid service or online gameplay backend.
 
 Retained evidence: `docs/economy-tests.log`, `docs/gameplay-tests.log`, `docs/apk-signature.txt`, `docs/render-validation.log` and `docs/screenshots/`. Render samples include draw-call and primitive counters from the software renderer; they are not phone benchmarks. APK packaging checks also confirmed that engine legal notices are included and test scripts are excluded.

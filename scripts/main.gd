@@ -49,6 +49,21 @@ func _ready() -> void:
 	if "--smoke" in OS.get_cmdline_user_args():
 		start_game(false)
 
+func stop_audio() -> void:
+	for sound in [ambient,engine,click]:
+		if is_instance_valid(sound):
+			sound.stop()
+			sound.stream = null
+
+func _exit_tree() -> void:
+	stop_audio()
+
+func quit_game() -> void:
+	stop_audio()
+	# Allow the audio mixer to release its queued playback reference.
+	await get_tree().create_timer(0.25).timeout
+	get_tree().quit()
+
 func _setup_inputs() -> void:
 	var mapping = {"forward":[KEY_W,KEY_UP],"back":[KEY_S,KEY_DOWN],"left":[KEY_A,KEY_LEFT],"right":[KEY_D,KEY_RIGHT],"run":[KEY_SHIFT],"brake":[KEY_SPACE],"interact":[KEY_E],"phone":[KEY_TAB],"pause":[KEY_ESCAPE]}
 	for action in mapping:
@@ -119,7 +134,7 @@ func show_menu() -> void:
 	var row2 = ui.row(panel)
 	ui.button(row2,"SETTINGS",show_settings)
 	ui.button(row2,"CREDITS",show_credits)
-	ui.button(row2,"EXIT",func(): get_tree().quit())
+	ui.button(row2,"EXIT",quit_game)
 	ui.text(panel,"Offline • Landscape • Original procedural world\nWASD / arrows to move, right mouse to look, E to interact, Tab for phone.\nOn mobile: left joystick, right-side camera drag, USE and RUN buttons.",17,Color("a4bfb6"))
 
 func _confirm_new() -> void:

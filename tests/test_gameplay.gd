@@ -102,6 +102,8 @@ func run() -> void:
 	check(e.state.clock == clock_before,"Menus pause simulation clock")
 	game.capture_state()
 	check(e.save_game() and e.load_game() and e.state.vehicles.has("suv") and e.state.properties.has("mansion"),"World ownership persists")
+	game.stop_audio()
+	await create_timer(0.25).timeout
 	game.queue_free()
 	await frames(3)
 	Geo.materials.clear()

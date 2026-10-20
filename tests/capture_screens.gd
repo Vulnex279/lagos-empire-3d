@@ -36,6 +36,8 @@ func run() -> void:
 	game.transition_home("home",true)
 	game.ui.toast_time = 0
 	await capture("interior")
+	game.stop_audio()
+	await create_timer(0.25).timeout
 	game.queue_free()
 	await process_frame
 	Geo.materials.clear()
