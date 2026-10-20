@@ -1,55 +1,122 @@
-# Economic rules and persistence
+# Living economy rules, accounting and persistence
 
-## Money and assets
+This is a fictional compressed game economy, not a model of actual Nigerian asset
+prices. Initial cash is exactly ₦25,000. Each new game receives a saved random seed;
+the same seed and actions replay the same daily economic state. There is no network
+or closed-app income. Menus pause the clock; one day lasts eight active minutes.
 
-Balances and quantities use integer naira and integer shares/crates. Cash and bank balances cannot become negative. Unpaid required bills are added to debt, which is explicitly supported. Maximum accepted financial counters are ₦1 trillion. Net worth is allowed to be negative because debt can exceed assets.
+## Accounting and transactions
 
-Net worth = cash + bank − debt + goods at wholesale cost + market value of shares + asset liquidation values. Vehicle value is 70% of purchase price scaled by condition. Property value is 80% of purchase price plus half of its recorded furnishing value. Business liquidation value is 70% of base price × 2.1^(level−1). Purchasing an asset therefore need not increase net worth.
+Money uses signed 64-bit integers in whole naira. Non-debt balances are nonnegative.
+Per-counter capacity is ₦9,000,000,000,000,000, below JSON's exact integer boundary.
+Displayed net worth saturates at that capacity. Tests exercise ₦10 trillion and
+larger transfers and persistence. Percentage operations split quotient/remainder
+before multiplying to prevent overflow. Basis-point rates round down, except debt
+interest rounds upward and exchange fees use an upward-offset/minimum-one rule.
+Lifetime counters saturate; purchases/transfers exceeding capacity roll back.
 
-Starting cash is ₦25,000. The sedan costs ₦45,000, SUV ₦850,000, mini-mart ₦90,000, delivery company ₦240,000 and mansion ₦2,500,000. These are compressed fictional game values, not claims about real Nigerian prices.
+Net worth includes cash + bank − debt, wholesale cargo, quoted shares and asset
+liquidation values. Vehicles liquidate at 70% of price scaled by condition.
+Properties liquidate at 80% of cycle-adjusted price plus furnishing value.
+Businesses liquidate at base price × (0.70 + 0.35 per upgrade). Buying/upgrading
+and immediately selling loses money. Cash income and spending are logged separately.
 
-## Day and week
+All financial mutations commit through EconomyManager. A commit snapshots, validates,
+writes/flushes a temporary file, preserves a validated backup, atomically renames,
+then announces success. Failure restores the old state. Transaction serials are
+saved. Mission IDs must exceed the last claimed reward; cargo and active mission
+are consumed in the same commit as payout. Owned assets must exist before resale.
+No collectible daily-income button exists: daily settlement advances the calendar,
+charges costs and records income together. Repeating a market tick on the same day
+is ignored. Resting advances actual game days and their obligations.
 
-One game day is 480 seconds of active play. New games start at 08:00. Menus pause time. Home rest advances a complete day and consumes job time. No earnings are accumulated while the application is closed.
+## Scheduled market simulation
 
-Daily events use a deterministic random generator seeded from the save seed and day. Reloading the same saved day does not reroll the market or costs.
+EconomicSimulationManager updates once per day. `data/sectors.json` configures six
+sectors' sensitivities. A 120-day sine cycle, phase-shifted by seed, drives expansion,
+recession and recovery. Spending is bounded around 75–125%, with small seeded noise.
+A bounded inflation index and a separate fuel cycle change expenses. Every ninth
+day may begin a three-day rainfall, shortage, festival or infrastructure event.
+These raise transport costs, constrain supply, raise spending or reduce fuel cost.
+There are cooldowns, bounded severity and explanatory news. No hidden catastrophe.
 
-- Rent: ₦1,200/day until mansion ownership.
-- Debt interest: 2%/day, rounded upward, after required bills.
-- Bank interest: 0.5% every seventh day, paid into the wallet.
-- Fuel price: uniformly sampled from ₦60–₦110/unit each day.
-- Demand multiplier: uniformly sampled from 0.80–1.25 each day.
-- Mini-mart base gross/cost: ₦15,000/₦4,500 per day.
-- Delivery-company base gross/cost: ₦36,000/₦13,000 per day.
-- Business levels 1–12: gross and costs multiply by 2.1^(level−1); gross also multiplies by demand. Upgrade cost is base purchase price × 2.2^current_level.
-- Each business has an 18% daily chance of an extra ₦2,000 × level scale repair bill.
+Property values follow consumer spending and the business cycle (70–140% bounds).
+Three named rivals use distinct quality/undercut/patient rules. Their sector pressure,
+wealth and debt change daily; an undercutting logistics rival responds to ownership
+of the player's delivery company. Rival pressure reduces business demand. They are
+lightweight competitive agents, not fully simulated corporations or dialogue AI.
 
-The constants and registries are deliberately centralized in `catalog.gd` and the daily event block in `economy.gd` so balance changes do not require UI changes. Every day reports demand/fuel changes and any repair setbacks; the ledger records charges and income.
+Stocks are fictional Palm Foods, Lagoon Energy and Kora Mobility. Fundamental
+values follow spending; energy also follows fuel. Returns combine bounded mean
+reversion, sector pressure and seeded volatility (6%, 10%, 14%). Prices are clamped
+to ₦25–₦10m per share. Orders charge about 1%, falling toward 0.8% with investing
+skill. No short selling or fractional shares. Same-day round trips lose fees.
 
-## Investments
+## Businesses and lifestyle
 
-All three companies are fictional. Initial prices are Palm Foods ₦800, Lagoon Energy ₦1,600, Kora Mobility ₦2,400. Their uniform daily random-return amplitudes are respectively 6%, 10%, 14%.
+Seven registry-driven categories: retail, logistics, restaurants, dealership,
+rental agency, hotel and holding company. Levels 1–12 increase capacity linearly
+by 60% of base per level. Revenue reflects capacity, spending sensitivity, rival
+competition and supply. Expenses reflect capacity, inflation, sector fuel
+sensitivity and management efficiency. Salaries are 45% of the displayed operating
+cost, already included rather than double charged. Maintenance adds 15% of costs
+every nineteenth day. Recessions can cause losses; upgrades cannot remove all risk.
 
-For each day:
+Base mini-mart gross/cost is ₦12,000/₦8,500; delivery company ₦28,000/₦20,000.
+Upgrade price scales linearly and entrepreneurship offers a bounded discount.
+No exponential level multiplier remains. Weekly bank yield is 0.5% on at most
+₦100m, paid into cash. High balances do not produce unbounded interest growth.
 
-`return = 0.002 + clamp((base/current − 1) × 0.03, −0.03, +0.03) + uniform(−volatility,+volatility)`
+Room rent follows inflation from ₦1,200 until duplex/mansion ownership. Owned
+properties incur daily maintenance of 0.05% of purchase price, reduced modestly by
+property skill. The duplex and portfolio-only offices generate cycle-adjusted rent.
+Mansions and vehicles impose costs without requiring luxury purchases for success.
 
-`new price = clamp(round(current × (1 + return)), 25, 10000000)`
+## Credit and recovery
 
-Each purchase and sale charges a 1% fee rounded upward (minimum ₦1). No short selling or fractional shares. Buying and immediately selling loses the fees. Daily returns can be negative. This simulation provides no real investment advice.
+Debt interest is 2% daily, rounded upward, after bills. Unaffordable required bills
+become debt rather than negative cash. Credit starts near ₦100,000; trust increases
+access and defaults reduce it. Loans have a seven-day review date; repayments move
+that date, while missed reviews damage trust. The player chooses repayment amounts.
 
-## Jobs, trading and recovery
+Community grant: ₦5,000 below ₦5,000 liquid funds, once per seven days. Walking jobs
+always remain available. Insolvency requires negative net worth, debt ≥₦25,000 and
+30 days since prior use. The explicit confirmation surrenders vehicles, businesses,
+shares, properties and bank funds, clears debt, restores the rented room and ₦5,000,
+and damages credit reputation. It cannot be repeatedly claimed for profit.
 
-Jobs require pickup within six metres of Dispatch. Completion requires the correct destination within six metres, a live deadline and a vehicle for passenger work. A mission is cleared in the same save commit as its reward. Repeated completion and save/reload cannot repeat that payout. Each accepted job has a monotonically increasing identifier. The first completion adds a one-time ₦2,500 bonus; first-car quest completion adds ₦5,000.
+## Contracts, skills and city memory
 
-Crates cost ₦700 at Ayo Market and sell at Suya Junction for floor(₦1,100 × demand). Capacity is 20. Goods are consumed when sold. Geographic checks are made by the gameplay coordinator, and the transaction layer checks the supplied location against the required location.
+Six authored jobs preserve the introduction. Four additional seeded offers vary
+with day, history, skill, trust, ownership and weather. They include passenger work,
+three-crate business supply and a trusted express choice with a shorter deadline.
+Pickup and delivery require physical locations; passengers require a car, supply
+requires owned business plus bought cargo. Recent targets are excluded from the
+procedural target list. Failures/cancellations reduce trust. Four completed jobs
+unlock express work; trust affects financing. News, contacts and stats expose state.
 
-A community grant supplies ₦5,000 if liquid funds are below ₦5,000 and seven days have elapsed since the previous grant. It does not erase debt. Walking deliveries require neither fuel nor an owned vehicle. Selling assets, withdrawing savings and continuing jobs provide additional recovery routes.
+Driving boosts generated passenger payouts; negotiation improves trade margins and
+contracts; management lowers costs; investing lowers fees; entrepreneurship reduces
+upgrade costs; property skill reduces upkeep. All effects are bounded. Networking
+experience is recorded; its separate perk tree is deferred. Trust and goodwill are
+compact bounded memory values, not an unlimited event log.
 
-## Save guarantees and boundaries
+Milestones extend through ₦10 trillion. Rewards are 1% capped at ₦1m and claimed
+once. Wealth is not sufficient to claim a fully authored corporate endgame: legacy,
+acquisition negotiations, fleets and chains remain deferred.
 
-Economic operations snapshot state, mutate, validate, write and flush a temporary JSON file, retain a valid backup, then rename the temporary file into place. Failure rolls the in-memory transaction back. Success is announced after the durable write. Integer types are restored explicitly after JSON parsing. Corrupt primary saves recover from a validated backup.
+## Save boundaries and evidence
 
-Gameplay position, fuel, condition and deadlines checkpoint every 20 seconds; financial transactions save immediately. Pausing the application also attempts to save. An abrupt process kill can lose up to one checkpoint interval of movement/time. Owned-car parking transforms are not saved; loading places the selected car at Eko Motors. There is one local save slot and one recovery backup.
+Version two migrates original version-one saves without resetting assets or cash.
+JSON financial quantities are restored to integer types. Primary corruption falls
+back to the validated backup; abandoned temporary files do not replace primary.
+Economic transactions save immediately; position/fuel/deadline checkpoints remain
+20 seconds. Abrupt process kills may lose movement since the latest checkpoint.
+Loaded active vehicles spawn at the dealership; exact parking transforms are not
+saved. No server anti-cheat or protection against manual whole-save rewinds.
 
-This is an offline save system, not cryptographic anti-tamper protection. A user who manually edits or restores entire save files can change or rewind progress. Power-loss behaviour at the exact rename boundary has not been fault-injected on Android hardware.
+Automated tests cover 12,000 portfolio days over four seeds plus 3,000 unemployed
+debt-stress days, deterministic replay, profit and
+loss periods, financial invariants, migration, interrupted temporary files, failed
+writes and duplicate actions. Real Android storage/process-kill tests and player
+pacing studies remain outstanding.

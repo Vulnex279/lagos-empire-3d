@@ -12,7 +12,7 @@ This project uses Godot's supported **prebuilt Android template export**, not a 
 
 ## GitHub Actions
 
-Push to `main`, open a pull request, or run **Validate and build Android APK** manually. The workflow checks out source, installs Java/SDK/Godot/templates, imports resources, runs economy/gameplay tests, generates a debug signing key, exports and verifies the APK, then uploads **lagos-empire-3d-android-debug** for 14 days.
+Push to `main`, open a pull request, or run **Validate and build Android APK** manually. The workflow checks out source, installs Java/SDK/Godot/templates, imports resources, runs economy/gameplay/asset tests and 15,000 simulated economic days, generates a debug signing key, exports and verifies the APK, then uploads **lagos-empire-3d-android-debug** for 14 days.
 
 The artifact contains the APK, checksum, test logs, export log and package information. Download it from the completed run's **Artifacts** section. No store release or public release publishing is configured. Debug signing keys generated on separate runners differ, so outputs are reproducible by process and pinned engine version, not bit-for-bit identical signatures.
 
@@ -44,3 +44,5 @@ Signature verification, ZIP integrity, manifest inspection and source tests are 
 The managed build environment's Java SDK installer could not retrieve repository manifests through its proxy. For the local build, official Android package archives were downloaded through the configured HTTP proxy and checked against their published repository SHA-1 values. CI uses the normal SDK installer on GitHub's runner.
 
 The local environment also prevents ADB from creating its default home directory; Godot's exit-time device scan logs this limitation after export. It does not invalidate the produced signed APK. No USB phone or Android emulator gameplay has been exercised here.
+
+The upgraded export is version 0.2.0 (version code 2). It retains the original package name. A locally signed upgrade uses the same debug key as the earlier local build so Android can preserve application data; saves migrate from schema one to two. CI-generated keys still differ across fresh runners.

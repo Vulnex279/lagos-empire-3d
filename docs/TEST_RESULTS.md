@@ -1,41 +1,77 @@
-# Verification results
+# Verification results — visual and living-economy alpha 0.2.0
 
-Verified in the managed Linux workspace with Godot 4.6.3. These results describe the playable foundation, not a finished production release.
+Test host: Linux x86-64, Godot 4.6.3 stable. Rendering checks use the actual Godot
+Compatibility renderer through Mesa llvmpipe at 1280×720. This is not an Android
+GPU benchmark. Tests exercise the integrated existing game, not separate demos.
 
-| Area | Result and evidence |
-| --- | --- |
-| Godot import and GDScript compilation | Successful headless editor import; no script parse failures |
-| Economy behavioural suite | 57 assertions passed; no failures |
-| Gameplay integration suite | 34 assertions passed; no failures |
-| Rendering | Actual Godot OpenGL Compatibility render on Mesa llvmpipe; menu, exploration, street, phone map, driving and interior captures inspected |
-| Android compilation/export | Debug arm64 APK exported using official Godot Android templates |
-| APK signature and integrity | Independent `apksigner verify`: v2 and v3 signatures verified; ZIP integrity and 16 KB native-library alignment checks passed |
-| Manifest | Package `com.lagosempire.game`, version 0.1.0, minimum API 24, target API 36, landscape, arm64, backup disabled |
-| Network/privacy | No Android permissions requested; no gameplay network dependency |
-| Installation and gameplay on Android | **Not tested**: no target phone or emulator gameplay available |
-| Mid-range Samsung FPS / RAM / thermals | **Not measured** |
-| GitHub Actions execution | Workflow supplied; remote execution blocked until an accessible repository is supplied |
+## Automated results
 
-## Automated coverage
+| Suite | Result | Scope |
+|---|---|---|
+| Original economy regressions | 57 checks passed | ₦25,000 start; jobs; trading; investments; bank; loans; purchases; business costs; save/load; corrupt primary recovery; failed-write rollback; invalid balances |
+| Integrated gameplay | 42 checks passed | Main menu; grounded walking; camera; touch joystick; all phone pages; room/duplex/mansion entry and exit; sedan/SUV/sports ownership; sports wheel pivots; driving; braking; fuel; garage; paused clock; persistence |
+| Living economy | 162 checks passed | Trillion-naira arithmetic and disk round trip; duplicate reward/sale rejection; reputation-gated offers; supply cargo consumption; deterministic varied missions; migration; interrupted temporary files; bankruptcy; exact loan interest; deadline/rest handling |
+| Asset checks | 14 checks passed | Full imported skeleton; seven required animation references; changing skeletal pose during walking; palette textures on imported assets |
+| External glTF dependencies | Passed | Every referenced image/buffer exists; source hashes retained in `assets/ASSET_HASHES.sha256` |
+| APK-packaged resources on host Godot | 42 gameplay checks passed | Extracted exported resources load and run the same gameplay suite using the matching desktop engine. This checks packaging/compiled scripts, not Android installation or gameplay. |
 
-Economy tests exercise new game, exact starting balance, insufficient funds, negative quantities, deposit/withdrawal conservation, overdraft rejection, remote pickup/completion rejection, single active mission, one-time intro rewards, completion replay after reload, passenger vehicle requirement, deadlines, goods inventory, stock fees, overselling rejection, loans and repayments, first-car purchase, duplicate ownership, mansion/furniture/business purchases, upgrades, daily revenue and costs, debt interest, market movement, full persistence, negative and NaN state rejection, unknown assets, corrupt-save backup recovery and rollback on failed storage.
+The long simulation covers **15,000 days**: 3,000 days for each of four deterministic
+portfolio seeds, plus 3,000 days of unemployed debt accumulation, with additional
+identical-seed replays. Histories stay bounded. No invalid balances, state rejection
+or overflow occurred. Extreme debt still permits insolvency recovery.
 
-Gameplay tests instantiate the real main scene. They exercise menu startup, floor collision, walking displacement, camera input, touch press/release, every phone screen, both interior transitions, car entry, acceleration, fuel use, braking, safe exit, storage/retrieval, both vehicle types, pausing and persistent ownership. The tests use direct input and game-state setup where needed; they are not a complete end-to-end manual playthrough or hardware touch test.
+Fixed three-business portfolios ended around ₦51–52 million cash after 3,000 days,
+with no debt in these tested starting conditions. Across 36,000 business-days,
+1,899 had losses and 34,101 had profits. This verifies that recession/competition
+can produce losses; it does not prove balanced first-hour pacing, fun endgame
+progression or every player strategy. Exponential business scaling was replaced
+with linear capacity; weekly bank interest and milestone rewards are capped.
 
-Two defects found by the first test pass were fixed: JSON number-type changes on reload and a vehicle-exit ground-overlap probe. Visual inspection also drove a lighting correction, clearer shop frontage, interior roofing and removal of an oversized near-camera interior sign. Static world geometry now uses spatial MultiMesh batches, retaining independent collision bodies.
+## Android build verification
 
-Clean-package verification exposed an intermittent audio-playback resource reference during immediate shutdown. Teardown now stops and releases streams and gives the mixer a short drain interval before quitting; the test and capture harnesses use the same cleanup.
+- Debug APK export succeeded using the official matching Android template.
+- APK ZIP integrity, v2/v3 signature and 16 KB page alignment checks passed.
+- Package version 0.2.0, arm64, minimum API 24, target API 36, landscape.
+- No Android Internet/network permissions requested. Required sector data, legal
+  credits, imported meshes and compiled scripts are inside the package.
+- The local upgrade uses the prior local debug signing key and the same package
+  identity. Save schema migration is tested; actual Android in-place upgrade is not.
+- The prepared GitHub Actions workflow includes source tests, long simulation,
+  asset validation, APK signing/alignment verification and artifact upload. It has
+  not run remotely because no accessible project repository is configured.
 
-Run `bash tools/validate.sh` to reproduce checks. `tests/capture_screens.gd` requires a real rendering display (a virtual X display with software OpenGL also works). Tests use separate save files and clean them up; screenshot capture uses volatile state. No test needs a paid service or online gameplay backend.
+Godot's post-export device scan cannot create the read-only default Android home
+in this managed environment. This produces an ADB diagnostic after successful
+export; independent verification succeeds. No phone is attached. An initial forced
+headless shutdown of extracted resources produced an audio/resource shutdown
+warning; the normal cleanup used by the full packaged gameplay suite exits cleanly.
 
-Retained evidence: `docs/economy-tests.log`, `docs/gameplay-tests.log`, `docs/apk-signature.txt`, `docs/render-validation.log` and `docs/screenshots/`. Render samples include draw-call and primitive counters from the software renderer; they are not phone benchmarks. APK packaging checks also confirmed that engine legal notices are included and test scripts are excluded.
+## Actual-engine visual evidence
 
-## Remaining verification work
+`docs/screenshots/upgrade-*.png` captures the character, district, SUV, sports car,
+mansion, furnished interior and economy screen from the running project. The
+capture harness uses temporary test funds and camera positions, not concept art;
+these images are visual QA evidence, not a claim that an ordinary new game starts
+with the photographed wealth. Regular new games still start with ₦25,000.
 
-- Install on the intended Samsung phone and play the complete introductory quest without developer setup.
-- Test simultaneous movement/look/use, device cutouts, wide landscape ratios and Android Back.
-- Test background/resume, process termination, low storage and a corrupt primary save on Android.
-- Measure sustained frame time, memory, load time, battery and temperature at all presets.
-- Drive both vehicles around every road and inspect all wall/door exits manually.
-- Run extended balance simulations and long play sessions toward ₦1 billion.
-- Trigger the supplied GitHub workflow after repository access is available; verify its uploaded artifact separately.
+Material checks caught missing palette dependencies, which were corrected and
+reimported. City texture mipmaps reduce distant shimmering. Hero cars use original
+exported mesh shells with wheel wells, rims, glazing and lights. Important city
+architecture uses imported facade/building meshes; the villa is an original GLB.
+Static details are joined by material and spatially instanced. Three quality presets
+control shadows, antialiasing, camera range and pedestrian activation distance.
+Final photographed views ranged from 259–834 draw calls and approximately
+57,000–555,000 submitted primitives, including shadow passes. The denser district
+raises the profiling priority on Android. Samples are recorded in the render log.
+They are not FPS measurements or guarantees.
+
+## Not verified / incomplete
+
+Physical Samsung installation, touchscreen ergonomics, sustained 30 FPS, RAM,
+thermal behaviour, Android background/process-kill recovery and release signing
+remain unverified. Art remains stylised and needs further clothing, vehicle and
+city-cohesion work to reach the requested premium finish. NPC navigation is authored
+sidewalk motion, traffic is parked scenery, and vehicle entry/exit is immediate.
+Advanced rival partnerships/acquisitions, insurance, manager decisions, chains,
+fleets, Legacy Mode, difficulty selection and fully authored trillionaire content
+are deferred. See `NEXT_STEPS.md`; no production-ready claim is made.

@@ -20,3 +20,14 @@ Touch movement and camera look track separate finger indices. Releasing the joys
 Service an owned vehicle at Eko Motors. Retrieve or store it at Eko Motors, or the mansion garage after purchase. The company car is supplied and serviced for passenger contracts and cannot be sold. A saved owned vehicle is retrieved at Eko Motors after loading; exact vehicle parking transforms are not persisted in this version.
 
 Use the floor marker near the interior door to exit, rest or furnish a home. Rest advances a whole economic day, including rent, interest, business operations and job deadlines. Menu time itself does not advance the simulation.
+
+The upgraded phone adds Contacts (trust and rivals), News (economic causes), and
+Statistics (skills, exact finances and wealth history). Express jobs require
+professional trust; supply contracts require a business and three purchased crates.
+Visit a residence before buying it; portfolio offices are bought at Marina Exchange
+and do not have an implemented interior. The duplex and mansion both replace room
+rent, but owned property maintenance continues.
+
+Omi Fuel & Service also services cars. Insolvency is available through Wallet and
+has an explicit asset-surrender confirmation; it is different from the small
+community grant. Saving occurs before financial success is announced.

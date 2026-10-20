@@ -135,7 +135,7 @@ func show_menu() -> void:
 	ui.button(row2,"SETTINGS",show_settings)
 	ui.button(row2,"CREDITS",show_credits)
 	ui.button(row2,"EXIT",quit_game)
-	ui.text(panel,"Offline • Landscape • Original procedural world\nWASD / arrows to move, right mouse to look, E to interact, Tab for phone.\nOn mobile: left joystick, right-side camera drag, USE and RUN buttons.",17,Color("a4bfb6"))
+	ui.text(panel,"Offline • Landscape • Imported art • Original city design\nWASD / arrows to move, right mouse to look, E to interact, Tab for phone.\nOn mobile: left joystick, right-side camera drag, USE and RUN buttons.",17,Color("a4bfb6"))
 
 func _confirm_new() -> void:
 	if not Economy.has_save():
@@ -278,12 +278,12 @@ func nearest_car() -> EmpireVehicle:
 
 func job_at_target() -> bool:
 	if Economy.state.mission.is_empty(): return false
-	var job: Dictionary = Catalog.JOBS[int(Economy.state.mission.template)]
+	var job: Dictionary = Economy.active_job()
 	return position_now().distance_to(Catalog.LOCATIONS[job.target].pos) < 6
 
 func objective_location() -> String:
 	if not Economy.state.mission.is_empty():
-		return Catalog.JOBS[int(Economy.state.mission.template)].target
+		return Economy.active_job().target
 	if not nav_target.is_empty(): return nav_target
 	if Economy.state.tutorial < 2: return "work"
 	if Economy.state.tutorial == 2: return "dealer"
@@ -292,12 +292,12 @@ func objective_location() -> String:
 func update_hud() -> void:
 	var s: Dictionary = Economy.state
 	_update_passenger()
-	ui.wallet.text = Catalog.naira(s.cash)
+	ui.wallet.text = Catalog.compact(s.cash)
 	var mins = int(float(s.clock)/Economy.DAY_SECONDS*1440)
 	ui.clock_label.text = "DAY %d  •  %02d:%02d  •  REP %d" % [s.day,mins/60,mins%60,s.reputation]
 	var dest = objective_location()
 	if not s.mission.is_empty():
-		ui.objective.text = "● "+Catalog.JOBS[int(s.mission.template)].name+"\n%d sec  •  %s" % [s.mission.remaining,Catalog.LOCATIONS[dest].name]
+		ui.objective.text = "● "+Economy.active_job().name+"\n%d sec  •  %s" % [s.mission.remaining,Catalog.LOCATIONS[dest].name]
 	elif s.tutorial < 2:
 		ui.objective.text = "YOUR FIRST MILE\nVisit Oja Dispatch and complete a delivery."
 	elif s.tutorial == 2:
@@ -348,7 +348,7 @@ func interact() -> void:
 		ui.toast("Move closer to a shop entrance, vehicle or destination marker.")
 
 func enter_car(car: EmpireVehicle) -> void:
-	if car.fleet and (Economy.state.mission.is_empty() or Catalog.JOBS[int(Economy.state.mission.template)].type != "driving"):
+	if car.fleet and (Economy.state.mission.is_empty() or Economy.active_job().type != "driving"):
 		ui.toast("The company car is available for passenger jobs from Oja Dispatch.")
 		return
 	active_car = car
@@ -434,7 +434,7 @@ func open_location(id: String) -> void:
 		"invest": open_phone("Investments")
 		"market","cafe": open_phone("Trade")
 		"mart","logistics": open_phone("Businesses")
-		"home","mansion","exit": show_home(id)
+		"home","mansion","apartment","exit": show_home(id)
 		_: open_phone("Map")
 
 func show_home(id: String) -> void:
@@ -453,12 +453,15 @@ func show_home(id: String) -> void:
 	elif Economy.state.properties.has(property_id):
 		ui.button(p,"ENTER YOUR HOME",func(): transition_home(property_id,true))
 	else:
-		ui.text(p,"Own a spacious residence and private garage. Price: ₦2,500,000.")
-		ui.button(p,"BUY PALM COURT",func():
-			Economy.purchase("properties","mansion")
-			show_home("mansion"))
+		ui.text(p,"Visit this home, then purchase it for "+Catalog.naira(Catalog.PROPERTIES[property_id].price)+". Maintenance is due daily.")
+		ui.button(p,"BUY THIS RESIDENCE",func():
+			Economy.purchase("properties",property_id)
+			show_home(property_id))
 
 func transition_home(id: String, enter: bool) -> void:
+	if enter and not Economy.state.properties.has(id):
+		ui.toast("Purchase this residence first.")
+		return
 	interior = id if enter else ""
 	var outward = -3.0 if Catalog.LOCATIONS[id].pos.z > 0 else 3.0
 	player.position = world.interior_exits[id]+Vector3(0,0.2,-2) if enter else Catalog.LOCATIONS[id].pos+Vector3(0,0.2,outward)
@@ -476,10 +479,10 @@ func _draw_furniture() -> void:
 	furniture = Node3D.new()
 	add_child(furniture)
 	if interior.is_empty(): return
-	var center = Vector3(350,0,0) if interior == "home" else Vector3(400,0,0)
+	var center = {"home":Vector3(350,0,0),"mansion":Vector3(400,0,0),"apartment":Vector3(450,0,0)}[interior]
 	for i in int(Economy.state.properties[interior]):
-		Geo.box(furniture,center+Vector3(2,0.5,i*1.8),Vector3(1.5,1,1.2),Color("4b8e84"),true)
-		Geo.cylinder(furniture,center+Vector3(3.8,0.5,i*1.8),0.3,1,Color("b98755"))
+		Art.model(furniture,"furniture/loungeChair.glb",center+Vector3(3,0,i*1.8),1.7)
+		Art.model(furniture,"furniture/pottedPlant.glb",center+Vector3(4.5,0,i*1.8),1.2)
 
 func show_pause() -> void:
 	if not playing: return
@@ -517,6 +520,7 @@ func show_settings() -> void:
 func apply_settings() -> void:
 	var preset: String = Economy.state.settings.graphics
 	world.sun.shadow_enabled = preset != "Low"
+	get_viewport().msaa_3d = Viewport.MSAA_4X if preset == "High" else (Viewport.MSAA_DISABLED if preset == "Low" else Viewport.MSAA_2X)
 	world.sun.directional_shadow_max_distance = 95 if preset == "High" else 60
 	var distance = 300 if preset == "High" else (150 if preset == "Low" else 220)
 	player.camera.far = distance
@@ -526,7 +530,8 @@ func apply_settings() -> void:
 
 func show_credits() -> void:
 	var p = ui.show_panel("CREDITS","An original city, an original story.",close_panel)
-	ui.text(p,"LAGOS EMPIRE 3D: FROM ZERO TO BILLIONS\nBuilt with Godot 4.6.3 (MIT licence).\nAll world geometry, fictional brands, UI, gameplay and synthesized audio were created for this project.\nNo third-party models, music or proprietary game content.\nGodot's bundled fonts and dependencies retain their upstream licences.\nSee LICENSE and ASSET_LICENSES.md in the source project.",23)
+	ui.text(p,"LAGOS EMPIRE 3D: FROM ZERO TO BILLIONS\nBuilt with Godot 4.6.3 (MIT licence).\nCharacter and animations: Quaternius (CC0), adapted for this project.\nCity architecture: Quaternius (CC0). Vehicles, furniture and nature: Kenney (CC0).\nAdditional villa and street props, fictional brands, UI and synthesized audio: original project work.\nGodot's bundled fonts and dependencies retain their upstream licences.\nSee LICENSE and ASSET_LICENSES.md in the source project.",23)
+	ui.button(p,"ART LICENCES",func(): show_legal("ASSET_CREDITS.txt"))
 	ui.button(p,"GODOT ENGINE LICENCE",func(): show_legal("GODOT_LICENSE.txt"))
 	ui.button(p,"THIRD-PARTY COPYRIGHT NOTICES",func(): show_legal("GODOT_COPYRIGHT.txt"))
 
@@ -552,7 +557,7 @@ func open_phone(app: String) -> void:
 	var tabs = GridContainer.new()
 	tabs.columns = 5
 	p.add_child(tabs)
-	for tab in ["Wallet","Jobs","Trade","Businesses","Properties","Vehicles","Investments","Map","Progress","Guide"]:
+	for tab in ["Wallet","Jobs","Trade","Businesses","Properties","Vehicles","Investments","Map","Progress","Contacts","News","Statistics","Guide"]:
 		ui.button(tabs,tab,func(): open_phone(tab))
 	var s: Dictionary = Economy.state
 	match app:
@@ -569,15 +574,16 @@ func open_phone(app: String) -> void:
 			action(r2,"Repay up to ₦25,000",func(): Economy.repay(mini(25000,int(s.cash))))
 			action(r2,"Repay all affordable",func(): Economy.repay(int(s.cash)))
 			action(p,"Community recovery grant • eligibility checked",func(): Economy.recover())
-			ui.text(p,"Daily rent: ₦1,200 until you own the mansion. Weekly bank yield: 0.5%. Unpaid bills become debt.",17)
+			action(p,"Insolvency review • surrender assets to clear debt",show_bankruptcy)
+			ui.text(p,"Daily rent: ₦1,200 until you own a duplex or mansion. Weekly bank yield: 0.5%. Unpaid bills become debt.",17)
 			for line in s.ledger.slice(0,8): ui.text(p,str(line),16)
 		"Jobs":
 			if not s.mission.is_empty():
-				ui.text(p,"ACTIVE: "+Catalog.JOBS[int(s.mission.template)].name+" • %d sec remaining" % s.mission.remaining,23)
+				ui.text(p,"ACTIVE: "+Economy.active_job().name+" • %d sec remaining" % s.mission.remaining,23)
 				action(p,"Cancel active job",func(): Economy.cancel_job())
-			ui.text(p,"Visit Oja Dispatch to collect work. Passenger jobs include use of the yellow company car.",18)
-			for i in Catalog.JOBS.size():
-				var job: Dictionary = Catalog.JOBS[i]
+			ui.text(p,("Ada at Oja Dispatch: Your reliability has opened our express contracts." if s.city_memory.trust >= 20 else "Ada at Oja Dispatch: Complete four contracts to earn access to express work.")+"\nPassenger jobs include the company car. Supply work consumes three purchased crates.",18)
+			for i in Economy.job_offers().size():
+				var job: Dictionary = Economy.job_offers()[i]
 				action(p,"%s   •   %s   •   %d sec" % [job.name,Catalog.naira(job.pay),job.seconds],func(): _accept_job(i))
 		"Trade":
 			ui.text(p,"Cargo: %d / 20 crates\nBuy wholesale at Ayo Market: ₦700/crate.\nSell to Suya Junction: %s/crate today." % [s.goods,Catalog.naira(int(1100*s.demand))],23)
@@ -592,8 +598,8 @@ func open_phone(app: String) -> void:
 				var level = int(s.businesses.get(id,0))
 				ui.text(p,b.name+"  •  "+("Level %d" % level if level else "Not owned"),25,Color("edc580"))
 				if level:
-					var scale = pow(2.1,level-1)
-					ui.text(p,"Today's gross %s / day • operating costs %s / day" % [Catalog.naira(int(b.revenue*scale*s.demand)),Catalog.naira(int(b.cost*scale))],18)
+					var report = EconomicSimulationManager.business_report(s,id)
+					ui.text(p,"Gross %s • costs %s • net %s/day\nSalaries included: %s • demand %d%% • competitor pressure %d%%" % [Catalog.naira(report.revenue),Catalog.naira(report.cost),Catalog.naira(report.profit),Catalog.naira(report.salaries),report.demand/100,report.competition/100],18)
 					var r = ui.row(p)
 					action(r,"Upgrade • "+Catalog.naira(Economy.upgrade_price("businesses",id)),func(): Economy.upgrade("businesses",id))
 					action(r,"Sell • "+Catalog.naira(Economy.asset_value("businesses",id)),func(): Economy.sell_asset("businesses",id))
@@ -614,8 +620,10 @@ func open_phone(app: String) -> void:
 								ui.toast("Leave the residence before selling it.")
 							else: Economy.sell_asset("properties",id))
 				else:
-					action(p,"Buy residence • "+Catalog.naira(Catalog.PROPERTIES[id].price),func(): Economy.purchase("properties",id))
-			ui.text(p,"Enter through the marked front doors. Furnishings appear inside. Mansion ownership replaces room rent.",18)
+					action(p,"Buy residence • "+Catalog.naira(Catalog.PROPERTIES[id].price),func():
+						if nearest_location() != ("invest" if id == "commercial" else id): ui.toast("Visit the property first, or Marina Exchange for rental offices.")
+						else: Economy.purchase("properties",id))
+			ui.text(p,"Enter through the marked front doors. Furnishings appear inside. Duplex or mansion ownership replaces room rent. Rental offices are portfolio-only; no enterable interior.",18)
 		"Vehicles":
 			ui.text(p,"Retrieve and store at Eko Motors or your mansion garage. Fuel and repairs are serviced at Eko Motors.",18)
 			for id in Catalog.VEHICLES:
@@ -634,7 +642,7 @@ func open_phone(app: String) -> void:
 						elif Economy.purchase("vehicles",id): retrieve_car(id))
 			action(p,"Store active vehicle in garage",_store_car)
 		"Investments":
-			ui.text(p,"Fictional market • daily price changes • 1% fee per order\nPrices reflect bounded volatility and mean reversion. Investments can lose value.",18)
+			ui.text(p,"Fictional market • daily price changes • Fees start at 1%, falling with investing skill\nPrices reflect consumer spending, fuel, competition and bounded volatility. Investments can lose value.",18)
 			for id in Catalog.STOCKS:
 				ui.text(p,"%s (%s)  •  %s  •  %d shares" % [Catalog.STOCKS[id].name,id,Catalog.naira(s.prices[id]),s.shares.get(id,0)],23)
 				var r = ui.row(p)
@@ -655,13 +663,25 @@ func open_phone(app: String) -> void:
 		"Progress":
 			ui.text(p,"REPUTATION %d  •  JOBS COMPLETED %d\nNET WORTH %s" % [s.reputation,s.completed,Catalog.naira(Economy.net_worth())],25)
 			ui.text(p,"Intro quest: "+("COMPLETE • you own your first car" if s.tutorial >= 3 else "Collect work → complete delivery → earn ₦45,000 → buy a Kora Compact."),20)
-			for target in [100000,1000000,10000000,100000000,1000000000]:
-				ui.text(p,("ACHIEVED  " if s.achievements.has(str(target)) else "GOAL  ")+Catalog.naira(target)+" net worth • 1% cash reward",20)
+			for target in [100000,1000000,10000000,100000000,1000000000,1000000000000]:
+				ui.text(p,("ACHIEVED  " if s.achievements.has(str(target)) else "GOAL  ")+Catalog.naira(target)+" net worth • reward capped at ₦1m",20)
+		"Contacts":
+			ui.text(p,"Professional trust %d • neighbourhood goodwill %d • credit defaults %d\nTrust 20 unlocks express contracts; trust also improves your credit limit." % [s.city_memory.trust,s.city_memory.goodwill,s.city_memory.defaults],21)
+			for rival in s.simulation.rivals:
+				ui.text(p,"%s • %s • %s\nWealth %s • debt %s • competitive pressure %d%%" % [rival.name,rival.sector,rival.strategy,Catalog.naira(rival.wealth),Catalog.naira(rival.debt),rival.strength/100],20)
+		"News":
+			ui.text(p,"%s • consumer spending %d%% • property index %d%%" % [s.simulation.cycle,s.simulation.spending/100,s.simulation.property_index/100],24)
+			for line in s.simulation.news: ui.text(p,str(line),19)
+		"Statistics":
+			ui.text(p,"Cash %s • wealth %s • credit limit %s\nNext loan review: day %d. Interest remains 2%% daily.\nSkills improve transport contracts, operating efficiency and investment experience." % [Catalog.naira(s.cash),Catalog.compact(Economy.net_worth()),Catalog.naira(Economy.credit_limit()),s.loan_due],20)
+			for skill in s.skills: ui.text(p,"%s: %d / 100" % [str(skill).capitalize(),s.skills[skill]],18)
+			ui.text(p,"NET WORTH HISTORY • latest 12 days",23)
+			for point in s.simulation.history.slice(-12): ui.text(p,"Day %d • %s • debt %s" % [point.day,Catalog.compact(point.worth),Catalog.naira(point.debt)],18)
 		"Guide":
 			show_guide()
 
 func _service_car(id: String, refuel: bool) -> void:
-	if nearest_location() != "dealer":
+	if not nearest_location() in ["dealer","petrol"]:
 		ui.toast("Vehicle service is available at Eko Motors.")
 		return
 	if Economy.service(id,refuel) and is_instance_valid(owned_car) and owned_car.kind == id:
@@ -694,7 +714,7 @@ func _store_car() -> void:
 		ui.toast("Vehicle stored. Retrieve it here whenever you need it.")
 
 func _accept_job(index: int) -> void:
-	if Economy.accept_job(index,position_now()) and Catalog.JOBS[index].type == "driving":
+	if Economy.accept_job(index,position_now()) and Economy.active_job().type == "driving":
 		fleet.fuel = 100
 		fleet.condition = 100
 		if active_car != fleet:
@@ -703,10 +723,10 @@ func _accept_job(index: int) -> void:
 			fleet.velocity = Vector3.ZERO
 
 func _update_passenger() -> void:
-	var needed = is_instance_valid(active_car) and not Economy.state.mission.is_empty() and Catalog.JOBS[int(Economy.state.mission.template)].type == "driving"
+	var needed = is_instance_valid(active_car) and not Economy.state.mission.is_empty() and Economy.active_job().type == "driving"
 	if needed and not is_instance_valid(passenger):
 		passenger = Geo.person(active_car,Vector3(0.4,0.3,0.1),Color("c46c5c"))
-		passenger.scale = Vector3(0.7,0.7,0.7)
+		passenger.play_state("Driving")
 	elif not needed and is_instance_valid(passenger):
 		passenger.get_parent().remove_child(passenger)
 		passenger.queue_free()
@@ -725,3 +745,13 @@ func _save_preferences() -> void:
 	config.set_value("settings","graphics",Economy.state.settings.graphics)
 	config.set_value("settings","audio",Economy.state.settings.audio)
 	if config.save("user://settings.cfg") != OK: ui.toast("Could not save settings.")
+
+func show_bankruptcy() -> void:
+	var p = ui.show_panel("FRESH START / INSOLVENCY","This gives up ALL owned vehicles, businesses, investments, bank deposits and purchased properties. You keep your rented room and receive ₦5,000. Debts clear; credit reputation falls.",func(): open_phone("Wallet"))
+	ui.button(p,"CONFIRM ASSET SURRENDER",func():
+		if Economy.bankrupt():
+			if is_instance_valid(active_car): exit_car()
+			if is_instance_valid(owned_car): owned_car.queue_free(); owned_car = null
+			interior = ""
+			player.position = Vector3(-25,0.2,9)
+		open_phone("Wallet"))

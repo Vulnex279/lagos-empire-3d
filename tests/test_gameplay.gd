@@ -46,7 +46,7 @@ func run() -> void:
 	finger.pressed = false
 	game.ui.touch._input(finger)
 	check(game.ui.touch.movement == Vector2.ZERO,"Joystick release clears movement")
-	for app in ["Wallet","Jobs","Trade","Businesses","Properties","Vehicles","Investments","Map","Progress","Guide"]:
+	for app in ["Wallet","Jobs","Trade","Businesses","Properties","Vehicles","Investments","Map","Progress","Contacts","News","Statistics","Guide"]:
 		game.open_phone(app)
 		await frames(1)
 		check(game.paused and game.ui.modal != null,"Phone screen renders: "+app)
@@ -96,6 +96,25 @@ func run() -> void:
 	game.player.position = game.owned_car.position+Vector3(2.5,0,0)
 	game.enter_car(game.owned_car)
 	check(game.active_car.kind == "suv","Luxury SUV is enterable")
+	game.exit_car()
+	e.state.cash = 4000000
+	check(e.purchase("vehicles","sports"),"Sports car purchase in world")
+	game.player.position = Catalog.LOCATIONS.dealer.pos
+	game.retrieve_car("sports")
+	await frames(3)
+	check(game.owned_car.wheels.size() == 4 and game.owned_car.steering_pivots.size() == 2,"Imported sports car has four moving wheels and two steering pivots")
+	game.enter_car(game.owned_car)
+	Input.action_press("forward")
+	await frames(35)
+	Input.action_release("forward")
+	check(game.owned_car.speed > 2,"Sports car accelerates with existing controls")
+	game.owned_car.speed = 0
+	game.exit_car()
+	check(e.purchase("properties","apartment"),"Duplex purchase")
+	game.transition_home("apartment",true)
+	await frames(5)
+	check(game.interior == "apartment","Duplex interior enters")
+	game.transition_home("apartment",false)
 	game.show_pause()
 	var clock_before = e.state.clock
 	await frames(10)

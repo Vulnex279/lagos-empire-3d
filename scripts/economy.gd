@@ -4,9 +4,9 @@ extends Node
 signal changed
 signal notice(message: String)
 
-const SAVE_VERSION = 1
+const SAVE_VERSION = 2
 const DAY_SECONDS = 480.0
-const LIMIT = 1000000000000
+const LIMIT = Money.LIMIT
 var save_path = "user://empire-save.json"
 var state: Dictionary = {}
 var last_error = ""
@@ -23,11 +23,15 @@ func defaults() -> Dictionary:
 		"tutorial":0,"achievements":[],"recovery_day":-7,"fuel_price":80,"demand":1.0,
 		"event":"Welcome to Lagos. Your first opportunity is at Oja Dispatch.",
 		"position":[-25.0,0.2,9.0],"yaw":0.0,"interior":"","selected_vehicle":"",
-		"settings":{"graphics":"Medium","audio":true},"ledger":[]}
+		"settings":{"graphics":"Medium","audio":true},"ledger":[],
+		"simulation":EconomicSimulationManager.defaults(),"transaction_id":0,"reward_claim":0,
+		"city_memory":{"trust":0,"goodwill":0,"defaults":0},"skills":{"driving":0,"negotiation":0,"management":0,"investing":0,"networking":0,"property":0,"entrepreneurship":0},
+		"mission_history":[],"bankruptcy_day":-30,"loan_due":0,"last_repayment":0}
 
 func new_game() -> bool:
 	var old = state.duplicate(true)
 	state = defaults()
+	state.seed = randi_range(1,1000000)
 	return _commit(old,"Your story begins with ₦25,000. Visit Oja Dispatch.")
 
 func has_save() -> bool:
@@ -40,9 +44,15 @@ func _read(path: String) -> Dictionary:
 	if parser.parse(FileAccess.get_file_as_string(path)) != OK:
 		return {}
 	var data = parser.data
-	if not data is Dictionary or data.get("version",0) != SAVE_VERSION or not data.get("state") is Dictionary:
+	if not data is Dictionary or not _whole(data.get("version",0),1,SAVE_VERSION) or not data.get("state") is Dictionary:
 		return {}
 	var s: Dictionary = data.state
+	if int(data.version) == 1:
+		var schema_v2 = defaults()
+		for key in schema_v2:
+			if not s.has(key): s[key] = schema_v2[key]
+		s.simulation.last_day = s.day
+		s.reward_claim = s.job_serial if s.mission.is_empty() else maxi(0,int(s.job_serial)-1)
 	if not valid(s):
 		return {}
 	# JSON numbers decode as floats. Restore integer financial quantities explicitly.
@@ -54,7 +64,17 @@ func _read(path: String) -> Dictionary:
 	if not s.mission.is_empty():
 		s.mission.id = int(s.mission.id)
 		s.mission.template = int(s.mission.template)
+	for field in ["simulation","skills","city_memory"]: s[field] = _integer_tree(s[field])
+	if s.mission.has("offer"): s.mission.offer = _integer_tree(s.mission.offer)
 	return s
+
+func _integer_tree(value: Variant) -> Variant:
+	if value is float and floor(value) == value: return int(value)
+	if value is Dictionary:
+		for key in value: value[key] = _integer_tree(value[key])
+	elif value is Array:
+		for i in value.size(): value[i] = _integer_tree(value[i])
+	return value
 
 func load_game() -> bool:
 	var data = _read(save_path)
@@ -82,16 +102,17 @@ func valid(s: Dictionary) -> bool:
 	for key in ["cash","bank","debt","income","expenses","reputation","job_serial","completed","goods","tutorial"]:
 		if not _whole(s[key],0,LIMIT):
 			return false
+	if not _whole(s.goods,0,20): return false
 	if not _whole(s.day,1,1000000) or not _number(s.clock,0,DAY_SECONDS) or not _whole(s.seed,0,LIMIT):
 		return false
 	if not _whole(s.recovery_day,-7,1000000) or not _whole(s.fuel_price,30,200) or not _number(s.demand,0.5,1.5):
 		return false
-	if not s.position is Array or s.position.size() != 3 or not s.interior in ["","home","mansion"]:
+	if not s.position is Array or s.position.size() != 3 or not s.interior in ["","home","mansion","apartment"]:
 		return false
 	for v in s.position:
 		if not _number(v,-1000,1000):
 			return false
-	if not _number(s.yaw,-1000000,1000000) or not s.selected_vehicle in ["","sedan","suv"]:
+	if not _number(s.yaw,-1000000,1000000) or not s.selected_vehicle in ["","sedan","suv","sports"]:
 		return false
 	for field in ["vehicles","properties","businesses","shares","prices","mission","settings"]:
 		if not s[field] is Dictionary:
@@ -117,8 +138,9 @@ func valid(s: Dictionary) -> bool:
 		if not _whole(s.prices.get(key),25,10000000):
 			return false
 	if not s.mission.is_empty():
-		if not _whole(s.mission.get("template"),0,Catalog.JOBS.size()-1) or not _whole(s.mission.get("id"),1,LIMIT):
+		if not _whole(s.mission.get("template"),0,9) or not _whole(s.mission.get("id"),1,LIMIT):
 			return false
+		if int(s.mission.template) >= Catalog.JOBS.size() and not _valid_job(s.mission.get("offer",{})): return false
 		if not _number(s.mission.get("remaining"),0,360):
 			return false
 	if not s.achievements is Array or not s.ledger is Array or s.ledger.size() > 30:
@@ -128,6 +150,36 @@ func valid(s: Dictionary) -> bool:
 			return false
 	if not s.event is String or not s.settings.get("graphics") in ["Low","Medium","High"] or not s.settings.get("audio") is bool:
 		return false
+	for key in ["transaction_id","reward_claim","loan_due","last_repayment"]:
+		if not _whole(s[key],0,LIMIT): return false
+	if not _whole(s.bankruptcy_day,-30,1000000): return false
+	for field in ["simulation","skills","city_memory"]:
+		if not s[field] is Dictionary: return false
+	for key in defaults().skills:
+		if not _whole(s.skills.get(key),0,100): return false
+	for key in defaults().city_memory:
+		if not _whole(s.city_memory.get(key),0,1000): return false
+	if not s.mission_history is Array or s.mission_history.size() > 12: return false
+	var sim: Dictionary = s.simulation
+	for key in EconomicSimulationManager.defaults():
+		if not sim.has(key): return false
+	for key in ["spending","inflation","property_index","fuel_index","supply"]:
+		if not _whole(sim[key],5000,20000): return false
+	if not _whole(sim.last_day,1,int(s.day)) or not _whole(sim.event_until,0,1000010): return false
+	if not sim.event_kind in ["steady","rain","shortage","festival","infrastructure"]: return false
+	if not sim.cycle in ["Expansion","Recovery","Recession"]: return false
+	if not sim.competition is Dictionary or not sim.reports is Dictionary: return false
+	for value in sim.competition.values():
+		if not _whole(value,0,2000): return false
+	if not sim.rivals is Array or sim.rivals.size() != 3: return false
+	for rival in sim.rivals:
+		if not rival is Dictionary: return false
+		for key in ["name","sector","strategy","wealth","debt","strength","relationship"]:
+			if not rival.has(key): return false
+		if not EconomicSimulationManager.sectors.has(rival.sector): return false
+		for key in ["wealth","debt","strength"]:
+			if not _whole(rival[key],0,LIMIT): return false
+	if not sim.history is Array or sim.history.size() > 60 or not sim.news is Array or sim.news.size() > 20: return false
 	return true
 
 func save_game() -> bool:
@@ -158,6 +210,7 @@ func save_game() -> bool:
 	return true
 
 func _commit(old: Dictionary, message: String) -> bool:
+	state.transaction_id += 1
 	if not save_game():
 		state = old
 		notice.emit(last_error)
@@ -181,13 +234,13 @@ func _spend(amount: int, reason: String) -> bool:
 	if amount < 0 or amount > state.cash:
 		return false
 	state.cash -= amount
-	state.expenses += amount
+	state.expenses = Money.add(int(state.expenses),amount)
 	_log(reason+" −"+Catalog.naira(amount))
 	return true
 
 func _earn(amount: int, reason: String) -> void:
 	state.cash += amount
-	state.income += amount
+	state.income = Money.add(int(state.income),amount)
 	_log(reason+" +"+Catalog.naira(amount))
 
 func transfer(amount: int, deposit: bool) -> bool:
@@ -199,10 +252,11 @@ func transfer(amount: int, deposit: bool) -> bool:
 	return _commit(old,"Transfer complete.")
 
 func borrow(amount: int) -> bool:
-	if amount <= 0 or state.debt+amount > 100000:
+	if amount <= 0 or state.debt+amount > credit_limit():
 		return reject("Credit limit: ₦100,000 total debt. Interest is 2% daily.")
 	var old = state.duplicate(true)
 	state.debt += amount
+	state.loan_due = int(state.day)+7
 	state.cash += amount
 	_log("Loan "+Catalog.naira(amount))
 	return _commit(old,"Loan received. Repay early to reduce daily interest.")
@@ -214,6 +268,9 @@ func repay(amount: int) -> bool:
 	var old = state.duplicate(true)
 	_spend(amount,"Debt repayment")
 	state.debt -= amount
+	state.last_repayment = state.day
+	state.loan_due = int(state.day)+7
+	state.city_memory.trust = mini(1000,int(state.city_memory.trust)+1)
 	return _commit(old,"Debt reduced.")
 
 func purchase(category: String, id: String) -> bool:
@@ -231,8 +288,12 @@ func purchase(category: String, id: String) -> bool:
 		return reject("You need "+Catalog.naira(registry[id].price)+" in your wallet.")
 	match category:
 		"vehicles": owned[id] = {"fuel":100.0,"condition":100.0}
-		"properties": owned[id] = 0
-		"businesses": owned[id] = 1
+		"properties":
+			owned[id] = 0
+			state.skills.property = mini(100,int(state.skills.property)+5)
+		"businesses":
+			owned[id] = 1
+			state.skills.entrepreneurship = mini(100,int(state.skills.entrepreneurship)+5)
 	_check_milestones()
 	return _commit(old,"Purchased "+registry[id].name+".")
 
@@ -251,7 +312,7 @@ func upgrade(category: String, id: String) -> bool:
 
 func upgrade_price(category: String, id: String) -> int:
 	var level = int(state[category].get(id,0))
-	return int(Catalog.BUSINESSES[id].price*pow(2.2,level)) if category == "businesses" else int(Catalog.PROPERTIES[id].upgrade*(level+1))
+	return Money.rate(Money.rate(int(Catalog.BUSINESSES[id].price),10000+level*6000),10000-int(state.skills.entrepreneurship)*5) if category == "businesses" else int(Catalog.PROPERTIES[id].upgrade)*(level+1)
 
 func sell_asset(category: String, id: String) -> bool:
 	if not category in ["vehicles","properties","businesses"] or not state[category].has(id) or id == "home":
@@ -270,8 +331,8 @@ func sell_asset(category: String, id: String) -> bool:
 func asset_value(category: String, id: String) -> int:
 	match category:
 		"vehicles": return int(Catalog.VEHICLES[id].price*0.7*state.vehicles[id].condition/100)
-		"properties": return int(Catalog.PROPERTIES[id].price*0.8+Catalog.PROPERTIES[id].upgrade*state.properties[id]*0.5)
-		"businesses": return int(Catalog.BUSINESSES[id].price*pow(2.1,state.businesses[id]-1)*0.7)
+		"properties": return Money.rate(Money.rate(int(Catalog.PROPERTIES[id].price),int(state.simulation.property_index)),8000)+Money.rate(int(Catalog.PROPERTIES[id].upgrade)*int(state.properties[id]),5000)
+		"businesses": return Money.rate(int(Catalog.BUSINESSES[id].price),7000+(int(state.businesses[id])-1)*3500)
 	return 0
 
 func net_worth() -> int:
@@ -281,13 +342,13 @@ func net_worth() -> int:
 			total += asset_value(category,id)
 	for id in state.shares:
 		total += int(state.shares[id]*state.prices[id])
-	return total
+	return clampi(total,-LIMIT,LIMIT)
 
 func stock(id: String, quantity: int, buy: bool) -> bool:
 	if not Catalog.STOCKS.has(id) or quantity <= 0 or quantity > 100000:
 		return reject("Invalid investment order.")
 	var amount = int(state.prices[id])*quantity
-	var fee = maxi(1,int(ceil(amount*0.01)))
+	var fee = maxi(1,Money.rate(amount+99,100-int(state.skills.investing)/5))
 	if not buy and state.shares.get(id,0) < quantity:
 		return reject("You do not own that many shares.")
 	var old = state.duplicate(true)
@@ -298,6 +359,7 @@ func stock(id: String, quantity: int, buy: bool) -> bool:
 	else:
 		state.shares[id] -= quantity
 		_earn(amount-fee,"Sell "+id)
+	state.skills.investing = mini(100,int(state.skills.investing)+1)
 	_check_milestones()
 	return _commit(old,"Investment order filled. Prices can rise or fall.")
 
@@ -315,29 +377,44 @@ func trade(buy: bool, quantity: int, location: String) -> bool:
 		state.goods += quantity
 	else:
 		state.goods -= quantity
-		_earn(quantity*int(1100*state.demand),"Market sale")
+		_earn(Money.rate(quantity*int(1100*state.demand),10000+int(state.skills.negotiation)*8),"Market sale")
+		state.skills.negotiation = mini(100,int(state.skills.negotiation)+1)
 	return _commit(old,"Trade complete.")
 
 func accept_job(index: int, position: Vector3) -> bool:
-	if index < 0 or index >= Catalog.JOBS.size() or position.distance_to(Catalog.LOCATIONS.work.pos) > 6:
+	var offers = job_offers()
+	if index < 0 or index >= offers.size() or position.distance_to(Catalog.LOCATIONS.work.pos) > 6:
 		return reject("Visit Oja Dispatch to collect a job.")
 	if not state.mission.is_empty():
 		return reject("Finish or cancel your current job first.")
+	var job: Dictionary = offers[index]
+	if int(job.get("trust",0)) > int(state.city_memory.trust): return reject("Earn professional trust by completing contracts first.")
+	if job.get("requires_business",false) and state.businesses.is_empty(): return reject("This supply contract requires a business.")
 	var old = state.duplicate(true)
 	state.job_serial += 1
-	state.mission = {"id":state.job_serial,"template":index,"remaining":Catalog.JOBS[index].seconds}
+	state.mission = {"id":state.job_serial,"template":index,"remaining":job.seconds,"offer":job.duplicate(true)}
 	state.tutorial = maxi(1,state.tutorial)
-	return _commit(old,"Job accepted. Follow the gold waypoint." + (" Use the yellow company car." if Catalog.JOBS[index].type == "driving" else ""))
+	return _commit(old,"Job accepted. Follow the gold waypoint." + (" Use the yellow company car." if job.type == "driving" else ""))
 
 func complete_job(position: Vector3, in_car: bool) -> bool:
 	if state.mission.is_empty():
 		return reject("No active job.")
-	var job: Dictionary = Catalog.JOBS[int(state.mission.template)]
+	var job: Dictionary = active_job()
 	if state.mission.remaining <= 0 or position.distance_to(Catalog.LOCATIONS[job.target].pos) > 6:
 		return reject("Reach the destination before the deadline.")
 	if job.type == "driving" and not in_car:
 		return reject("Bring your passenger in a vehicle.")
+	if int(state.mission.id) <= int(state.reward_claim): return reject("This reward has already been claimed.")
+	if int(job.get("crates",0)) > int(state.goods): return reject("This contract needs three market crates in your cargo.")
 	var old = state.duplicate(true)
+	state.reward_claim = state.mission.id
+	state.goods -= int(job.get("crates",0))
+	state.city_memory.trust = mini(1000,int(state.city_memory.trust)+5)
+	state.city_memory.goodwill = mini(1000,int(state.city_memory.goodwill)+1)
+	var skill = "driving" if job.type == "driving" else "networking"
+	state.skills[skill] = mini(100,int(state.skills[skill])+1)
+	state.mission_history.push_front(job.target)
+	if state.mission_history.size() > 12: state.mission_history.pop_back()
 	state.mission = {} # Consumed in the same durable commit as the reward.
 	state.completed += 1
 	state.reputation += 5
@@ -350,6 +427,7 @@ func complete_job(position: Vector3, in_car: bool) -> bool:
 
 func cancel_job() -> bool:
 	var old = state.duplicate(true)
+	state.city_memory.trust = maxi(0,int(state.city_memory.trust)-2)
 	state.mission = {}
 	return _commit(old,"Job cancelled. No reward paid.")
 
@@ -375,12 +453,13 @@ func recover() -> bool:
 	return _commit(old,"₦5,000 recovery grant received. Walking deliveries remain available.")
 
 func tick(delta: float) -> void:
-	state.clock += delta
+	state.clock = minf(DAY_SECONDS,state.clock+maxf(0,delta))
 	if not state.mission.is_empty():
 		state.mission.remaining = maxf(0,state.mission.remaining-delta)
 		if state.mission.remaining <= 0:
 			var old = state.duplicate(true)
 			state.mission = {}
+			state.city_memory.trust = maxi(0,int(state.city_memory.trust)-3)
 			_commit(old,"Deadline missed. Collect another job at Oja Dispatch.")
 	if state.clock >= DAY_SECONDS:
 		state.clock = DAY_SECONDS # rollback remains valid on storage failure
@@ -389,48 +468,105 @@ func tick(delta: float) -> void:
 func _bill(amount: int, reason: String) -> void:
 	var paid = mini(int(state.cash),amount)
 	_spend(paid,reason)
-	state.debt += amount-paid
+	state.debt = Money.add(int(state.debt),amount-paid)
 	if amount > paid:
 		_log("Unpaid "+reason+" added to debt: "+Catalog.naira(amount-paid))
 
 func advance_day() -> bool:
+	if state.day >= 1000000: return reject("Calendar limit reached.")
 	var old = state.duplicate(true)
 	state.day += 1
 	state.clock = 0.0
-	var rng = RandomNumberGenerator.new()
-	rng.seed = int(state.seed)+int(state.day)*7919
-	state.demand = rng.randf_range(0.8,1.25)
-	state.fuel_price = rng.randi_range(60,110)
-	state.event = "Demand %d%% • fuel ₦%d/unit" % [int(state.demand*100),state.fuel_price]
-	for id in Catalog.STOCKS:
-		var info: Dictionary = Catalog.STOCKS[id]
-		var reversion = clampf((float(info.base)/state.prices[id]-1)*0.03,-0.03,0.03)
-		var change = 0.002+reversion+rng.randf_range(-info.volatility,info.volatility)
-		state.prices[id] = clampi(int(round(state.prices[id]*(1+change))),25,10000000)
+	EconomicSimulationManager.step(state)
+	state.simulation.reports = {}
 	for id in state.businesses:
-		var scale = pow(2.1,state.businesses[id]-1)
-		_earn(int(Catalog.BUSINESSES[id].revenue*scale*state.demand),Catalog.BUSINESSES[id].name)
-		_bill(int(Catalog.BUSINESSES[id].cost*scale),"Business operations")
-		if rng.randf() < 0.18:
-			var setback = int(2000*scale)
-			_bill(setback,"Unexpected business repairs")
-			state.event += " • repairs "+Catalog.naira(setback)
-	if not state.properties.has("mansion"):
-		_bill(1200,"Room rent")
+		var report = EconomicSimulationManager.business_report(state,id)
+		state.simulation.reports[id] = report
+		_earn(mini(int(report.revenue),LIMIT-int(state.cash)),Catalog.BUSINESSES[id].name)
+		_bill(int(report.cost),"Salaries and operations")
+		if int(state.day)%19 == 0:
+			_bill(Money.rate(int(report.cost),1500),"Scheduled facility maintenance")
+		if report.profit > 0:
+			state.city_memory.goodwill = mini(1000,int(state.city_memory.goodwill)+1)
+			state.skills.management = mini(100,int(state.skills.management)+1)
+	for id in state.properties:
+		if id == "home": continue
+		var info: Dictionary = Catalog.PROPERTIES[id]
+		var rent = Money.rate(int(info.get("rental",0)),int(state.simulation.property_index))
+		_earn(mini(rent,LIMIT-int(state.cash)),"Rental portfolio")
+		_bill(Money.rate(Money.rate(int(info.price),5),10000-int(state.skills.property)*10),"Property maintenance")
+	if not state.properties.has("mansion") and not state.properties.has("apartment"):
+		_bill(Money.rate(1200,int(state.simulation.inflation)),"Room rent")
 	if state.debt > 0:
-		state.debt += maxi(1,int(ceil(state.debt*0.02)))
+		state.debt = Money.add(int(state.debt),maxi(1,Money.rate(int(state.debt),200)+(1 if int(state.debt)%50 != 0 else 0)))
+		if state.loan_due > 0 and state.day >= state.loan_due:
+			state.city_memory.defaults = mini(1000,int(state.city_memory.defaults)+1)
+			state.city_memory.trust = maxi(0,int(state.city_memory.trust)-5)
+			state.loan_due = int(state.day)+7
+			state.event += " Loan review overdue: repay to restore trust."
 	if int(state.day)%7 == 0:
-		_earn(int(state.bank*0.005),"Weekly bank interest")
+		_earn(mini(Money.rate(mini(int(state.bank),100000000),50),LIMIT-int(state.cash)),"Weekly bank interest (yield capped at ₦100m deposit)")
 	_check_milestones()
+	state.simulation.history.append({"day":state.day,"worth":net_worth(),"cash":state.cash,"debt":state.debt})
+	if state.simulation.history.size() > 60: state.simulation.history.pop_front()
 	return _commit(old,"Day %d • %s" % [state.day,state.event])
 
+func credit_limit() -> int:
+	return maxi(25000,100000+mini(200,int(state.city_memory.trust))*1000-mini(15,int(state.city_memory.defaults))*5000)
+
+func bankrupt() -> bool:
+	if net_worth() >= 0 or state.debt < 25000 or state.day-state.bankruptcy_day < 30:
+		return reject("Restructuring requires negative net worth, debt above ₦25,000 and 30 days since last use.")
+	var old = state.duplicate(true)
+	state.vehicles.clear()
+	state.businesses.clear()
+	state.properties = {"home":0}
+	state.shares.clear()
+	state.bank = 0
+	state.cash = 5000
+	state.debt = 0
+	state.goods = 0
+	state.loan_due = 0
+	state.selected_vehicle = ""
+	state.interior = ""
+	state.position = [-25.0,0.2,9.0]
+	state.bankruptcy_day = state.day
+	state.city_memory.defaults = mini(1000,int(state.city_memory.defaults)+5)
+	state.city_memory.trust = 0
+	_log("Insolvency settlement: assets surrendered; debt discharged")
+	return _commit(old,"Fresh start: assets surrendered, debts cleared, ₦5,000 recovery cash. Walking jobs remain available.")
+
+func active_job() -> Dictionary:
+	if state.mission.is_empty(): return {}
+	return state.mission.get("offer",Catalog.JOBS[mini(int(state.mission.template),Catalog.JOBS.size()-1)])
+
+func _valid_job(job: Variant) -> bool:
+	return job is Dictionary and job.get("name") is String and job.get("type") in ["delivery","driving","supply"] and Catalog.LOCATIONS.has(job.get("target","")) and _whole(job.get("pay"),1,100000) and _whole(job.get("seconds"),30,360) and _whole(job.get("crates",0),0,3)
+
+func job_offers() -> Array:
+	var offers = Catalog.JOBS.duplicate(true)
+	var rng = RandomNumberGenerator.new()
+	rng.seed = int(state.seed)+int(state.day)*101+int(state.job_serial)*17
+	var targets = ["market","cafe","invest","bank","waterfront","mansion","apartment"]
+	var previous = str(state.mission_history[0]) if not state.mission_history.is_empty() else ""
+	targets.erase(previous)
+	for i in 4:
+		var target = targets.pop_at(rng.randi_range(0,targets.size()-1))
+		var type = ["delivery","driving","supply","delivery"][i]
+		var title = ["Neighbourhood dispatch","Priority passenger","Business supply • 3 crates","Trusted express • shorter deadline"][i]
+		var distance = Catalog.LOCATIONS.work.pos.distance_to(Catalog.LOCATIONS[target].pos)
+		var pay = clampi(3500+int(distance*45)+i*1800,4500,22000)
+		pay = Money.rate(pay,10000+mini(1000,int(state.skills.driving if type == "driving" else state.skills.negotiation)*10))
+		offers.append({"name":title+" → "+Catalog.LOCATIONS[target].name,"type":type,"target":target,"pay":pay,"seconds":100 if i == 3 else (240 if state.simulation.event_kind == "rain" else 180),"trust":20 if i == 3 else 0,"requires_business":i == 2,"crates":3 if i == 2 else 0})
+	return offers
+
 func _check_milestones() -> void:
-	for milestone in [100000,1000000,10000000,100000000,1000000000]:
+	for milestone in [100000,1000000,10000000,100000000,1000000000,1000000000000,10000000000000]:
 		var key = str(milestone)
 		if net_worth() >= milestone and not state.achievements.has(key):
 			state.achievements.append(key)
 			state.reputation += 25
-			_earn(int(milestone*0.01),"Milestone reward")
+			_earn(mini(Money.rate(milestone,100),1000000),"Milestone reward (capped at ₦1m)")
 	if state.vehicles.has("sedan") and state.tutorial < 3 and state.completed > 0:
 		state.tutorial = 3
 		_earn(5000,"Intro quest complete")

@@ -6,7 +6,7 @@ var running = false
 var enabled = true
 var yaw = 0.0
 var pitch = -0.30
-var body: Node3D
+var body: EmpireActor
 var pivot: Node3D
 var arm: SpringArm3D
 var camera: Camera3D
@@ -20,12 +20,13 @@ func _ready() -> void:
 	collision.shape = capsule
 	collision.position.y = 0.95
 	add_child(collision)
-	body = Geo.person(self,Vector3.ZERO,Color("f0cf85"))
+	body = EmpireActor.new()
+	add_child(body)
 	pivot = Node3D.new()
 	pivot.position.y = 1.6
 	add_child(pivot)
 	arm = SpringArm3D.new()
-	arm.spring_length = 6.5
+	arm.spring_length = 5.0
 	arm.margin = 0.25
 	arm.add_excluded_object(get_rid())
 	pivot.add_child(arm)
@@ -48,7 +49,7 @@ func _physics_process(delta: float) -> void:
 	if input.length() < 0.1:
 		input = Input.get_vector("left","right","forward","back")
 	var direction = Basis(Vector3.UP,yaw)*Vector3(input.x,0,input.y)
-	var speed = 9.0 if running or Input.is_action_pressed("run") else 5.2
+	var speed = 7.2 if running or Input.is_action_pressed("run") else 4.0
 	velocity.x = move_toward(velocity.x,direction.x*speed,delta*28)
 	velocity.z = move_toward(velocity.z,direction.z*speed,delta*28)
 	if not is_on_floor():
@@ -58,11 +59,4 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	if direction.length() > 0.1:
 		body.rotation.y = lerp_angle(body.rotation.y,atan2(-direction.x,-direction.z),delta*12)
-		stride += delta*speed*1.7
-		body.get_child(3).rotation.x = sin(stride)*0.32
-		body.get_child(4).rotation.x = -sin(stride)*0.32
-		body.get_child(5).rotation.x = -sin(stride)*0.22
-		body.get_child(6).rotation.x = sin(stride)*0.22
-	else:
-		for i in range(3,7):
-			body.get_child(i).rotation.x = lerpf(body.get_child(i).rotation.x,0,delta*10)
+	body.locomotion(Vector2(velocity.x,velocity.z).length())

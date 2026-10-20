@@ -1,0 +1,17 @@
+LAGOS EMPIRE 3D — ART CREDITS
+
+Quaternius — https://quaternius.com
+Universal Base Characters (Standard), Universal Animation Library (Standard), Downtown City MegaKit (Standard).
+Licence: Creative Commons CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+Character clothing, hair, animation assembly and district layout adapted for Lagos Empire.
+
+Kenney — https://kenney.nl/assets
+Car Kit 3.1; Furniture Kit 2.0; Nature Kit 2.1; City Kit Suburban 2.0.
+Licence: Creative Commons CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Original project artwork: Oba Grand SUV and Adura GT sports-car meshes, Palm Court villa, market stalls, petrol pumps, power poles, gates, street lighting, UI, icon and fictional brands. Project MIT licence.
+Original synthesized audio: project MIT licence.
+
+Full source URLs, specific bundled licence notices and modification details are retained in ASSET_LICENSES.md and assets/licences in the source distribution.

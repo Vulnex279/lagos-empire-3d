@@ -60,16 +60,9 @@ static func label(parent: Node3D, text: String, pos: Vector3, size: int = 40) ->
 	return l
 
 static func person(parent: Node3D, pos: Vector3, shirt: Color) -> Node3D:
-	var p = Node3D.new()
+	var p = EmpireActor.new()
 	parent.add_child(p)
 	p.position = pos
-	box(p, Vector3(0,1.1,0), Vector3(0.58,0.7,0.3), shirt)
-	cylinder(p, Vector3(0,1.7,0), 0.19, 0.36, Color("754c36"))
-	box(p, Vector3(0,1.91,0), Vector3(0.36,0.10,0.32), Color("252b2c"))
-	box(p, Vector3(-0.17,0.4,0), Vector3(0.23,0.8,0.26), Color("243647"))
-	box(p, Vector3(0.17,0.4,0), Vector3(0.23,0.8,0.26), Color("243647"))
-	box(p, Vector3(-0.4,1.05,0), Vector3(0.18,0.7,0.22), shirt)
-	box(p, Vector3(0.4,1.05,0), Vector3(0.18,0.7,0.22), shirt)
 	return p
 
 static func batch_static(parent: Node3D) -> void:

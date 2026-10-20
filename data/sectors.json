@@ -1,0 +1,8 @@
+{
+  "retail": {"fuel_sensitivity": 800, "spending_sensitivity": 9000, "supply": 10000},
+  "logistics": {"fuel_sensitivity": 4200, "spending_sensitivity": 6500, "supply": 10000},
+  "hospitality": {"fuel_sensitivity": 1200, "spending_sensitivity": 13000, "supply": 10000},
+  "mobility": {"fuel_sensitivity": 2500, "spending_sensitivity": 11000, "supply": 10000},
+  "property": {"fuel_sensitivity": 500, "spending_sensitivity": 8000, "supply": 10000},
+  "corporate": {"fuel_sensitivity": 1800, "spending_sensitivity": 10000, "supply": 10000}
+}

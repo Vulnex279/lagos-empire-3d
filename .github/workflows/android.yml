@@ -47,6 +47,7 @@ jobs:
           python3 tools/configure_android.py
           godot --headless --path . --export-debug Android build/lagos-empire-3d-debug.apk 2>&1 | tee build/android-export.log
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose build/lagos-empire-3d-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 build/lagos-empire-3d-debug.apk
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging build/lagos-empire-3d-debug.apk > build/apk-package.txt
           sha256sum build/lagos-empire-3d-debug.apk > build/SHA256SUMS
       - uses: actions/upload-artifact@v4
