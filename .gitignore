@@ -1,0 +1,9 @@
+.godot/
+build/*
+!build/.gitkeep
+!build/.gdignore
+*.keystore
+*.apk
+*.aab
+*.tmp
+.DS_Store

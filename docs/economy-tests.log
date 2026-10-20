@@ -1,0 +1,60 @@
+Godot Engine v4.6.3.stable.official.7d41c59c4 - https://godotengine.org
+
+PASS: New game saves successfully
+PASS: Starts with exactly ₦25,000
+PASS: Unaffordable car rejected
+PASS: Rejected purchase leaves balance unchanged
+PASS: Negative transfer rejected
+PASS: Deposit conserves funds
+PASS: Withdrawal conserves funds
+PASS: Bank overdraft rejected
+PASS: Remote job pickup rejected
+PASS: Mission pickup at workplace
+PASS: Only one active mission
+PASS: Remote completion rejected
+PASS: Delivery rewards valid destination
+PASS: First job reward and one-time bonus
+PASS: Repeat completion cannot duplicate payout
+PASS: Reload preserves consumed reward
+PASS: Reload cannot replay reward
+PASS: Passenger job pickup
+PASS: Passenger needs a vehicle
+PASS: Passenger arrival pays
+PASS: Earned funds buy first vehicle
+PASS: Intro quest completes and pays bonus once
+PASS: Duplicate vehicle purchase rejected
+PASS: Replayable job accepted
+PASS: Expired mission gives no payout
+PASS: Wholesale restricted to market
+PASS: Goods purchase
+PASS: Goods sold at destination
+PASS: Cannot resell consumed cargo
+PASS: Investment purchase
+PASS: Investment sell charges fee
+PASS: Short selling unsupported
+PASS: Negative share quantity rejected
+PASS: Loan creates matching debt
+PASS: Loan limit enforced
+PASS: Debt repayment
+PASS: Mansion purchase
+PASS: Duplicate property purchase rejected
+PASS: Furniture upgrade
+PASS: Mini-mart purchase
+PASS: Delivery company purchase
+PASS: Business upgrade
+PASS: Daily financial event commits
+PASS: Business revenue and costs recorded
+PASS: Daily debt interest applied
+PASS: Market prices move daily
+PASS: Full economy round-trip persistence
+PASS: Unpaid rent becomes debt without negative cash
+PASS: Bankruptcy recovery grant
+PASS: Recovery grant cannot be repeatedly claimed
+PASS: Walking work remains available while in debt
+PASS: Negative cash in save rejected
+PASS: NaN cash in save rejected
+PASS: Unknown owned asset rejected
+PASS: Save before corruption test
+PASS: Corrupt primary recovers valid backup
+PASS: Storage failure rolls back financial transaction
+ECONOMY RESULTS: 57 checks, 0 failures

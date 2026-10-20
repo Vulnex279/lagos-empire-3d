@@ -1,0 +1,61 @@
+name: Validate and build Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GODOT_VERSION: 4.6.3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android dependencies
+        run: sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Install pinned Godot and Android templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo install "/tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          curl -fL --retry 3 -o /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          unzip -j -q /tmp/templates.tpz templates/android_debug.apk templates/android_release.apk -d "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+      - name: Import and run behavioural tests
+        run: bash tools/validate.sh
+      - name: Configure debug signing and export
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android" build
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+          python3 tools/configure_android.py
+          godot --headless --path . --export-debug Android build/lagos-empire-3d-debug.apk 2>&1 | tee build/android-export.log
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose build/lagos-empire-3d-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging build/lagos-empire-3d-debug.apk > build/apk-package.txt
+          sha256sum build/lagos-empire-3d-debug.apk > build/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lagos-empire-3d-android-debug
+          path: |
+            build/*.apk
+            build/SHA256SUMS
+            build/*tests.log
+            build/android-export.log
+            build/apk-package.txt
+          retention-days: 14

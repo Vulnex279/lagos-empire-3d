@@ -1,0 +1,37 @@
+Godot Engine v4.6.3.stable.official.7d41c59c4 - https://godotengine.org
+
+PASS: Main menu launches
+PASS: New game enters 3D world
+PASS: Player grounded on collision surface
+PASS: Walking moves character
+PASS: Camera responds to look input
+PASS: Touch joystick produces movement
+PASS: Joystick release clears movement
+PASS: Phone screen renders: Wallet
+PASS: Phone screen renders: Jobs
+PASS: Phone screen renders: Trade
+PASS: Phone screen renders: Businesses
+PASS: Phone screen renders: Properties
+PASS: Phone screen renders: Vehicles
+PASS: Phone screen renders: Investments
+PASS: Phone screen renders: Map
+PASS: Phone screen renders: Progress
+PASS: Phone screen renders: Guide
+PASS: Rented room interior enterable
+PASS: Interior exit returns to neighbourhood
+PASS: Gameplay mansion purchase
+PASS: Mansion enterable
+PASS: Vehicle entry transfers control
+PASS: Vehicle acceleration moves car
+PASS: Driving consumes fuel
+PASS: Braking stops vehicle
+PASS: Vehicle exit restores walking
+PASS: Car purchase in gameplay state
+PASS: Garage retrieves owned car
+PASS: Garage stores car
+PASS: Luxury SUV purchase
+PASS: Second vehicle can be retrieved
+PASS: Luxury SUV is enterable
+PASS: Menus pause simulation clock
+PASS: World ownership persists
+GAMEPLAY RESULTS: 34 checks, 0 failures
