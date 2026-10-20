@@ -1,5 +1,7 @@
 # Lagos Empire 3D: From Zero to Billions
 
+> Your people your dream
+
 An offline, landscape, third-person 3D Android game built with **Godot 4.6.3 stable** and GDScript. Start with ₦25,000 in a fictional Lagos-inspired district and earn, drive, trade and invest toward a billion-naira empire.
 
 **Version 0.2 is an integrated visual and living-economy alpha.** It upgrades the existing game with a rigged animated humanoid, imported textured architecture, original detailed SUV/sports-car GLBs, a villa, three enterable homes and a seeded economic sandbox. It remains stylised and needs further art direction, physical Android tests and performance tuning before any production-ready claim.
