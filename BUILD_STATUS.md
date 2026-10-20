@@ -40,3 +40,12 @@ thermal, RAM, multitouch or Android process-kill evidence. GitHub repository
 creation is still blocked by the authenticated connection's permissions; no
 approved remote repository exists. Local commits/source bundle are deliverable.
 No public publishing has been performed.
+
+## GitHub transfer update
+
+The destination is `Vulnex279/lagos-empire-3d`. Its initial README history has been
+merged with the complete local history, retaining the original tagline. The user
+authorized public repository visibility after the integration could not change it
+to private. Earlier repository-access blockers above describe the build checkpoint.
+The existing APK is now included under `downloads/`; its checksum matches the
+original delivery. This transfer does not rebuild the game and skips CI.
