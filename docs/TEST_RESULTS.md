@@ -12,6 +12,7 @@ GPU benchmark. Tests exercise the integrated existing game, not separate demos.
 | Integrated gameplay | 42 checks passed | Main menu; grounded walking; camera; touch joystick; all phone pages; room/duplex/mansion entry and exit; sedan/SUV/sports ownership; sports wheel pivots; driving; braking; fuel; garage; paused clock; persistence |
 | Living economy | 162 checks passed | Trillion-naira arithmetic and disk round trip; duplicate reward/sale rejection; reputation-gated offers; supply cargo consumption; deterministic varied missions; migration; interrupted temporary files; bankruptcy; exact loan interest; deadline/rest handling |
 | Asset checks | 14 checks passed | Full imported skeleton; seven required animation references; changing skeletal pose during walking; palette textures on imported assets |
+| Fresh checkout validation | Passed | Full import and all four suites pass without the development import cache |
 | External glTF dependencies | Passed | Every referenced image/buffer exists; source hashes retained in `assets/ASSET_HASHES.sha256` |
 | APK-packaged resources on host Godot | 42 gameplay checks passed | Extracted exported resources load and run the same gameplay suite using the matching desktop engine. This checks packaging/compiled scripts, not Android installation or gameplay. |
 

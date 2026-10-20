@@ -30,6 +30,7 @@ large-value persistence, duplicate rewards/sales, insolvency and save migration.
 All source suites pass: 57 economy, 42 gameplay, 162 living-economy and 14 asset checks.
 Android debug export, v2/v3 signature, ZIP integrity and alignment checks pass.
 The packaged resources also pass the 42 gameplay checks on the desktop engine.
+A fresh checkout also passes import and all four suites.
 Actual-engine screenshots and logs accompany the delivery; see `docs/TEST_RESULTS.md`.
 
 ## External limits
